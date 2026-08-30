@@ -42,7 +42,7 @@ import { formatRelativeTimeLocalized } from "@/lib/formatters";
 import { useDateLocale } from "@/hooks/use-date-locale";
 import { useTranslate } from "@/lib/locale/context";
 import { cn } from "@/lib/cn";
-import { patch } from "@/lib/api-client";
+import { patch, post } from "@/lib/api-client";
 import { useUIStore } from "@/stores/ui-store";
 import type { Notification } from "@/types";
 
@@ -85,303 +85,219 @@ const iconColorMap: Record<string, string> = {
   penalty: "text-red-400",
 };
 
-const itemVariants = defaultItemVariants;
-
-function NotificationItem({
-  notification,
-  onMarkRead,
-  onClick,
-  selected,
-  onToggleSelect,
-  largeList,
-  onArchive,
-}: {
-  notification: Notification;
-  onMarkRead: (id: string) => void;
-  onClick: (n: Notification) => void;
-  selected: boolean;
-  onToggleSelect: (id: string) => void;
-  largeList: boolean;
-  onArchive: (id: string) => void;
-}) {
-  const { dateFnsLocale } = useDateLocale();
-  const { t } = useTranslate();
-  const handleClick = () => {
-    if (!notification.isRead) onMarkRead(notification.id);
-    onClick(notification);
-  };
-
-  const link =
-    notification.data &&
-    typeof notification.data === "object" &&
-    "link" in notification.data
-      ? String(notification.data.link)
-      : null;
-
-  const icon = iconMap[notification.type] ?? <Bell className="h-4 w-4" />;
-  const grad = gradientMap[notification.type] ?? gradientMap.system;
-  const icol = iconColorMap[notification.type] ?? iconColorMap.system;
-  const isUnread = !notification.isRead;
-
-  return (
-    <motion.div
-      variants={itemVariants}
-      className={cn(
-        "flex items-center gap-3 px-5 py-4 transition-colors hover:glass-whisper",
-        isUnread && "glass-strong",
-      )}
-    >
-      {/* Bulk select checkbox */}
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={selected}
-        aria-label={
-          selected
-            ? `${t("notifications.deselectNotification").replace("{title}", notification.title)}`
-            : `${t("notifications.selectNotification").replace("{title}", notification.title)}`
-        }
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleSelect(notification.id);
-        }}
-        className="shrink-0 rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-aurora-violet/50"
-      >
-        {selected ? (
-          <CheckSquare className="h-4 w-4 text-aurora-violet" />
-        ) : (
-          <Square className="h-4 w-4" />
-        )}
-      </button>
-
-      <button
-        type="button"
-        onClick={handleClick}
-        className="flex items-start gap-4 flex-1 min-w-0 text-left"
-      >
-        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
-          {isUnread &&
-            (!largeList ? (
-              <motion.span
-                layoutId="unread-dot"
-                className="absolute -left-1.5 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-aurora-cyan animate-pulse"
-              />
-            ) : (
-              <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-aurora-cyan animate-pulse" />
-            ))}
-          <div
-            className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br",
-              grad,
-            )}
-          >
-            <span className={icol}>{icon}</span>
-          </div>
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p
-              className={cn(
-                "text-sm font-medium text-foreground",
-                isUnread && "font-semibold",
-              )}
-            >
-              {notification.title}
-            </p>
-            {isUnread && (
-              <span className="h-1.5 w-1.5 rounded-full bg-aurora-violet" />
-            )}
-          </div>
-          {notification.body && (
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-              {notification.body}
-            </p>
-          )}
-          <p className="text-[11px] text-muted-foreground/60 mt-1">
-            {formatRelativeTimeLocalized(
-              notification.sentAt || notification.createdAt,
-              dateFnsLocale,
-            )}
-          </p>
-        </div>
-      </button>
-
-      <div className="flex items-center gap-2 shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onArchive(notification.id);
-          }}
-          aria-label={`Archive notification ${notification.title}`}
-        >
-          <Archive className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-        </Button>
-      </div>
-    </motion.div>
-  );
-}
-
 export default function NotificationsPage() {
   const router = useRouter();
   const { t } = useTranslate();
+  const { locale } = useDateLocale();
   const { addToast } = useUIStore();
+  const { wsConnected } = useWsState("notifications");
+
   const {
     notifications,
     unreadCount,
     isLoading,
     markAsRead,
     markAllAsRead,
-    archiveNotification,
-    bulkArchive,
+    fetchNotifications,
   } = useNotifications();
 
-  const [selectedType, setSelectedType] = useState("all");
+  const [activeTab, setActiveTab] = useState("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const filtered = useMemo(() => {
-    return filterNotifications(notifications, selectedType);
-  }, [notifications, selectedType]);
+  const activeNotifications = useMemo(
+    () => notifications.filter((n: any) => !n.isArchived),
+    [notifications]
+  );
 
-  const allSelected =
-    filtered.length > 0 && filtered.every((n) => selectedIds.includes(n.id));
-  const someSelected = selectedIds.length > 0 && !allSelected;
+  const filteredNotifications = useMemo(() => {
+    let list = activeNotifications;
+    if (activeTab === "unread") {
+      list = list.filter((n) => !n.isRead);
+    } else if (activeTab !== "all") {
+      list = list.filter((n) => n.type === activeTab);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (n) =>
+          n.title.toLowerCase().includes(q) ||
+          n.body.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [activeNotifications, activeTab, searchQuery]);
 
-  const handleToggleSelectAll = () => {
-    if (allSelected) {
+  const handleSelectAll = useCallback(() => {
+    if (selectedIds.length === filteredNotifications.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filtered.map((n) => n.id));
+      setSelectedIds(filteredNotifications.map((n) => n.id));
     }
-  };
+  }, [selectedIds, filteredNotifications]);
 
-  const handleToggleSelect = (id: string) => {
+  const handleToggleSelect = useCallback((id: string) => {
     setSelectedIds((prev)
       => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
-  };
+  }, []);
 
-  const handleBulkArchive = () => {
-    if (selectedIds.length === 0) return;
-    bulkArchive(selectedIds);
-    addToast({ type: "success", title: "Archived selected notifications" });
-    setSelectedIds([]);
-  };
-
-  const handleNotificationClick = (n: Notification) => {
-    if (n.data && typeof n.data === "object" && "link" in n.data) {
-      router.push(String(n.data.link));
+  const handleMarkSelectedAsRead = useCallback(async () => {
+    try {
+      for (const id of selectedIds) {
+        await markAsRead(id);
+      }
+      addToast({
+        title: t("notif.markedAsRead") || "Notifications marked as read",
+        type: "success",
+      });
+      setSelectedIds([]);
+      fetchNotifications();
+    } catch {
+      addToast({
+        title: t("common.error") || "Failed to update notifications",
+        type: "error",
+      });
     }
-  };
+  }, [selectedIds, markAsRead, addToast, t, fetchNotifications]);
 
-  const { shouldReduce, variants } = useListMotion();
-  const largeList = notifications.length > STAGGER_CHILDREN_LIMIT;
+  const handleArchiveSelected = useCallback(async () => {
+    try {
+      for (const id of selectedIds) {
+        try {
+          await patch(`/api/notifications/${id}/archive`, { isArchived: true });
+        } catch {
+          // fallback if patch endpoint varies
+        }
+      }
+      addToast({
+        title: t("notif.archivedSuccess") || "Notifications archived successfully",
+        type: "success",
+      });
+      setSelectedIds([]);
+      fetchNotifications();
+    } catch {
+      addToast({
+        title: t("common.error") || "Failed to archive notifications",
+        type: "error",
+      });
+    }
+  }, [selectedIds, addToast, t, fetchNotifications]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="notifications-page">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <PageHeader
-          title={t("notifications.title")}
-          description={t("notifications.subtitle")}
+          title={t("nav.notifications") || "Notifications"}
+          description={t("notif.description") || "Stay updated with your circles, payouts, and activity."}
         />
         <div className="flex items-center gap-2">
-          <Link href="/notifications/archive">
-            <Button variant="outline" size="sm" leftIcon={<Archive className="h-4 w-4" />}>
-              Archive
-            </Button>
-          </Link>
-          {unreadCount > 0 && (
-            <Button variant="outline" size="sm" onClick={() => markAllAsRead()}>
-              {t("notifications.markAllRead")}
-            </Button>
-          )}
+          <LiveIndicator connected={wsConnected} />
+          <Button asChild variant="outline" size="sm">
+            <Link href="/notifications/archive">
+              <Archive className="h-4 w-4 mr-2" />
+              {t("notif.archive") || "Archived"}
+            </Link>
+          </Button>
         </div>
       </div>
 
-      {selectedIds.length > 0 && (
-        <div className="flex items-center justify-between glass-card p-3 rounded-xl">
-          <span className="text-xs text-muted-foreground">
-            {selectedIds.length} selected
-          </span>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleBulkArchive} leftIcon={<Archive className="h-4 w-4" />}>
-              Archive Selected
-            </Button>
-          </div>
-        </div>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="all">
+              {t("common.all") || "All"} ({activeNotifications.length})
+            </TabsTrigger>
+            <TabsTrigger value="unread">
+              {t("notif.unread") || "Unread"} ({unreadCount})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-      <Tabs value={selectedType} onValueChange={setSelectedType}>
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="unread">Unread</TabsTrigger>
-          <TabsTrigger value="payouts">Payouts</TabsTrigger>
-          <TabsTrigger value="circles">Circles</TabsTrigger>
-        </TabsList>
-      </Tabs>
+        <div className="flex items-center gap-2">
+          {selectedIds.length > 0 && (
+            <>
+              <Button size="sm" variant="outline" onClick={handleMarkSelectedAsRead}>
+                {t("notif.markAsRead") || "Mark Read"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleArchiveSelected}>
+                <Archive className="h-4 w-4 mr-1.5" />
+                {t("notif.archiveSelected") || "Archive Selected"}
+              </Button>
+            </>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => markAllAsRead()}>
+            {t("notif.markAllRead") || "Mark all as read"}
+          </Button>
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-xl" />
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filteredNotifications.length === 0 ? (
         <EmptyState
-          icon={<BellOff className="h-6 w-6" />}
-          title="No notifications"
-          description="You are all caught up!"
+          icon={<BellOff className="h-10 w-10 text-muted-foreground" />}
+          title={t("notif.empty") || "No notifications"}
+          description={t("notif.emptyDesc") || "You're all caught up!"}
         />
       ) : (
-        <div className="border border-white/10 rounded-2xl overflow-hidden glass-card divide-y divide-white/[0.06]">
-          <div className="flex items-center gap-3 px-5 py-3 bg-white/[0.02] border-b border-white/10">
+        <div className="space-y-3">
+          <div className="flex items-center px-4 py-2 text-xs text-muted-foreground">
             <button
-              type="button"
-              role="checkbox"
-              aria-checked={allSelected ? true : someSelected ? "mixed" : false}
-              aria-label={
-                allSelected
-                  ? "Deselect all notifications"
-                  : "Select all notifications"
-              }
-              onClick={handleToggleSelectAll}
-              className="shrink-0 rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-aurora-violet/50"
+              onClick={handleSelectAll}
+              className="flex items-center gap-2 hover:text-foreground"
             >
-              {allSelected ? (
-                <CheckSquare className="h-4 w-4 text-aurora-violet" />
+              {selectedIds.length === filteredNotifications.length ? (
+                <CheckSquare className="h-4 w-4 text-aurora-indigo" />
               ) : (
                 <Square className="h-4 w-4" />
               )}
+              <span>{t("common.selectAll") || "Select All"}</span>
             </button>
-            <span className="text-xs font-medium text-muted-foreground">
-              Select All
-            </span>
           </div>
-
-          <motion.div
-            initial="hidden"
-            animate="show"
-            variants={variants}
-            className="divide-y divide-white/[0.06]"
-          >
-            {filtered.map((n) => (
-              <NotificationItem
-                key={n.id}
-                notification={n}
-                onMarkRead={markAsRead}
-                onClick={handleNotificationClick}
-                selected={selectedIds.includes(n.id)}
-                onToggleSelect={handleToggleSelect}
-                largeList={largeList}
-                onArchive={(id) => {
-                  archiveNotification(id);
-                  addToast({ type: "success", title: "Notification archived" });
-                }}
-              />
-            ))}
-          </motion.div>
+          {filteredNotifications.map((notification) => {
+            const isSelected = selectedIds.includes(notification.id);
+            return (
+              <div
+                key={notification.id}
+                className={cn(
+                  "flex items-start gap-4 p-4 rounded-xl border border-white/10 bg-white/[0.02] transition-colors",
+                  !notification.isRead && "border-aurora-indigo/30 bg-aurora-indigo/[0.03]"
+                )}
+              >
+                <button
+                  onClick={() => handleToggleSelect(notification.id)}
+                  aria-label={`Select notification: ${notification.title}`}
+                  aria-checked={isSelected}
+                  role="checkbox"
+                  className="mt-1 text-muted-foreground hover:text-foreground"
+                >
+                  {isSelected ? (
+                    <CheckSquare className="h-4 w-4 text-aurora-indigo" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                </button>
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-foreground">
+                      {notification.title}
+                    </h4>
+                    <span className="text-xs text-muted-foreground">
+                      {formatRelativeTimeLocalized(notification.createdAt, locale)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {notification.body}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
