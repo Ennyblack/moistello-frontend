@@ -156,7 +156,7 @@ export default function DepositPage() {
       case "verify":
         return "Verifying your transaction. This may take a few minutes."
       case "complete":
-        return `Deposit complete. $${payment?.quote.estimatedUsdc.toFixed(2) ?? ""} USDC added to your wallet.`
+        return `Deposit complete. ${payment?.quote.estimatedUsdc != null ? formatAmount(payment.quote.estimatedUsdc) : ""} USDC added to your wallet.`
       default:
         return ""
     }
@@ -233,7 +233,7 @@ export default function DepositPage() {
               </div>
               {amountNgn && parseFloat(amountNgn) > 0 && (
                 <p className="text-sm text-emerald-400 font-medium">
-                  ≈ ${(parseFloat(amountNgn) / 1550).toFixed(2)} USDC
+                  ≈ ${formatAmount(parseFloat(amountNgn) / 1550)} USDC
                 </p>
               )}
             </div>
@@ -331,11 +331,11 @@ export default function DepositPage() {
           <div className="bg-white/[0.03] rounded-xl px-5 py-4 space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Estimated USDC</span>
-              <span className="text-emerald-400 font-medium">${payment.quote.estimatedUsdc.toFixed(2)}</span>
+              <span className="text-emerald-400 font-medium">${formatAmount(payment.quote.estimatedUsdc)}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Rate</span>
-              <span className="text-foreground">₦1 = ${(1 / 1550).toFixed(6)} USDC</span>
+              <span className="text-foreground">₦1 = ${formatAmount(1 / 1550, undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 })} USDC</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Spread</span>
@@ -447,7 +447,7 @@ export default function DepositPage() {
               <div>
                 <p className="font-heading text-2xl font-bold gradient-text-extended">Deposit Complete</p>
                 <p className="text-lg font-semibold text-foreground mt-2">
-                  +${payment.quote.estimatedUsdc.toFixed(2)} USDC
+                  +${formatAmount(payment.quote.estimatedUsdc)} USDC
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
                   from ₦{payment.amountNgn.toLocaleString()} deposit
@@ -463,7 +463,7 @@ export default function DepositPage() {
             </div>
             <div className="flex justify-between px-5 py-3.5 text-sm">
               <span className="text-muted-foreground">Rate</span>
-              <span className="text-foreground">₦{payment.amountNgn} → ${payment.quote.estimatedUsdc.toFixed(2)}</span>
+              <span className="text-foreground">₦{payment.amountNgn} → ${formatAmount(payment.quote.estimatedUsdc)}</span>
             </div>
           </div>
 

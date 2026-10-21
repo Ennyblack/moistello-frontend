@@ -1,0 +1,108 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatAmount unit tests > snapshots for edge values > pins expected snapshot outputs for diverse edge amounts 1`] = `
+[
+  {
+    "balance": "0.0000",
+    "deDE": "0,00",
+    "enUS": "0.00",
+    "input": 0,
+  },
+  {
+    "balance": "0.0000",
+    "deDE": "0,00",
+    "enUS": "0.00",
+    "input": 0,
+  },
+  {
+    "balance": "0.0000",
+    "deDE": "0,00",
+    "enUS": "0.00",
+    "input": 0.00001,
+  },
+  {
+    "balance": "0.0000",
+    "deDE": "0,00",
+    "enUS": "0.00",
+    "input": -0.00001,
+  },
+  {
+    "balance": "0.0049",
+    "deDE": "0,00",
+    "enUS": "0.00",
+    "input": 0.0049,
+  },
+  {
+    "balance": "0.0050",
+    "deDE": "0,01",
+    "enUS": "0.01",
+    "input": 0.005,
+  },
+  {
+    "balance": "0.0100",
+    "deDE": "0,01",
+    "enUS": "0.01",
+    "input": 0.01,
+  },
+  {
+    "balance": "0.9990",
+    "deDE": "1,00",
+    "enUS": "1.00",
+    "input": 0.999,
+  },
+  {
+    "balance": "1.0000",
+    "deDE": "1,00",
+    "enUS": "1.00",
+    "input": 1,
+  },
+  {
+    "balance": "1.0050",
+    "deDE": "1,01",
+    "enUS": "1.01",
+    "input": 1.005,
+  },
+  {
+    "balance": "12.3450",
+    "deDE": "12,35",
+    "enUS": "12.35",
+    "input": 12.345,
+  },
+  {
+    "balance": "99.9990",
+    "deDE": "100,00",
+    "enUS": "100.00",
+    "input": 99.999,
+  },
+  {
+    "balance": "1,000.0000",
+    "deDE": "1.000,00",
+    "enUS": "1,000.00",
+    "input": 1000,
+  },
+  {
+    "balance": "1,234,567.8900",
+    "deDE": "1.234.567,89",
+    "enUS": "1,234,567.89",
+    "input": 1234567.89,
+  },
+  {
+    "balance": "999,999,999.9900",
+    "deDE": "999.999.999,99",
+    "enUS": "999,999,999.99",
+    "input": 999999999.99,
+  },
+  {
+    "balance": "1,000,000,000.0000",
+    "deDE": "1.000.000.000,00",
+    "enUS": "1,000,000,000.00",
+    "input": 1000000000,
+  },
+  {
+    "balance": "1,000,000,000,000.0000",
+    "deDE": "1.000.000.000.000,00",
+    "enUS": "1,000,000,000,000.00",
+    "input": 1000000000000,
+  },
+]
+`;

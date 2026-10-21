@@ -1,3 +1,4 @@
+import { formatBalance } from "@/lib/formatters"
 "use client"
 
 import { Landmark, CircleAlert } from "lucide-react"
@@ -60,7 +61,7 @@ export function AmountStep({
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Available</span>
               <span className="text-foreground">
-                {selectedWalletData.balance.toFixed(4)} {asset}
+                {formatBalance(selectedWalletData.balance)} {asset}
               </span>
             </div>
           )}
