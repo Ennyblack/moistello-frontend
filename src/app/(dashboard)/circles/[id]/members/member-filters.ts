@@ -2,7 +2,7 @@ import type { CircleMember } from "@/types"
 
 export type JoinedFilter = "" | "7d" | "30d" | "1y"
 
-interface MemberFilterValues {
+export interface MemberFilterValues {
   search: string
   status: string
   position: string
@@ -29,6 +29,8 @@ export function filterCircleMembers(
     const matchesSearch =
       !query ||
       member.userId.toLowerCase().includes(query) ||
+      (member.userName ? member.userName.toLowerCase().includes(query) : false) ||
+      (member.userAddress ? member.userAddress.toLowerCase().includes(query) : false) ||
       String(member.position).includes(query)
     const matchesStatus = !filters.status || member.status === filters.status
     const matchesPosition =
