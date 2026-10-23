@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useRef } from "react";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -12,6 +12,10 @@ import {
   type ProposalStatus,
   type GovernanceProposal,
   type VoteChoice,
+  getGovernanceDelegations,
+  delegateVotingPower,
+  revokeDelegation,
+  type GovernanceDelegationState,
 } from "@/lib/governance-api";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useGovernanceVotes } from "@/stores/governance-votes-store";
@@ -144,3 +148,37 @@ export function useVoteOnProposal(id: string) {
 
 /** The path a vote for `id` would be submitted to. Exported for tests. */
 export { VOTE_PATH };
+
+export function useGovernanceDelegation(address?: string) {
+  return useQuery({
+    queryKey: queryKeys.governance.delegations(address),
+    queryFn: () => getGovernanceDelegations(address),
+    staleTime: 15_000,
+  });
+}
+
+export function useDelegateVotingPower() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      delegateAddress,
+      votingPower,
+    }: {
+      delegateAddress: string;
+      votingPower?: number;
+    }) => delegateVotingPower(delegateAddress, votingPower),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["governance-delegations"] });
+    },
+  });
+}
+
+export function useRevokeDelegation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => revokeDelegation(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["governance-delegations"] });
+    },
+  });
+}

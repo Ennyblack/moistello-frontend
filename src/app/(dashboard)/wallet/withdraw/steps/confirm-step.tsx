@@ -1,3 +1,4 @@
+import { formatAmount } from "@/lib/formatters"
 "use client"
 
 import { Shield, CircleAlert } from "lucide-react"
@@ -40,7 +41,7 @@ export function ConfirmStep({
         <div className="flex justify-between px-5 py-4">
           <span className="text-sm text-muted-foreground">Sending</span>
           <span className="text-sm font-semibold text-foreground">
-            {parseFloat(amountUsdc).toFixed(2)} {asset}
+            {formatAmount(amountUsdc)} {asset}
           </span>
         </div>
         <div className="flex justify-between px-5 py-4">
@@ -52,7 +53,7 @@ export function ConfirmStep({
         <div className="flex justify-between px-5 py-4">
           <span className="text-sm text-muted-foreground">Rate</span>
           <span className="text-sm text-foreground">
-            1 {asset} ≈ ₦{(quote.estimatedNgn / parseFloat(amountUsdc)).toFixed(2)}
+            1 {asset} ≈ ₦{formatAmount(quote.estimatedNgn / parseFloat(amountUsdc))}
           </span>
         </div>
         <div className="flex justify-between px-5 py-4">

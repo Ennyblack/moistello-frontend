@@ -81,6 +81,8 @@ export interface CircleMember {
   userName?: string | null
   userAddress?: string | null
   joinedAt: string
+  totalContributed?: number | null
+  totalContributions?: number | null
 }
 
 export interface Contribution {

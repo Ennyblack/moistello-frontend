@@ -64,6 +64,7 @@ export const queryKeys = {
     list: (filters?: Record<string, unknown>) =>
       ["governance-proposals", filters] as const,
     detail: (id: string) => ["governance-proposal", id] as const,
+    delegations: (address?: string) => ["governance-delegations", address] as const,
   },
   notifications: {
     all: ["notifications"] as const,
