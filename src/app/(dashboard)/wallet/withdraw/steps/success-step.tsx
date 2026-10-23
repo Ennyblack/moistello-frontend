@@ -1,3 +1,4 @@
+import { formatAmount } from "@/lib/formatters"
 "use client"
 
 import { CircleCheck, ExternalLink } from "lucide-react"
@@ -39,7 +40,7 @@ export function SuccessStep({ quote, amountUsdc, asset, accountNumber, selectedB
       <div className="bg-white/[0.03] rounded-xl divide-y divide-dotted divide-white/[0.06]">
         <div className="flex justify-between px-5 py-3.5 text-sm">
           <span className="text-muted-foreground">Amount sent</span>
-          <span className="text-foreground">{parseFloat(amountUsdc).toFixed(2)} {asset}</span>
+          <span className="text-foreground">{formatAmount(amountUsdc)} {asset}</span>
         </div>
         <div className="flex justify-between px-5 py-3.5 text-sm">
           <span className="text-muted-foreground">You received</span>

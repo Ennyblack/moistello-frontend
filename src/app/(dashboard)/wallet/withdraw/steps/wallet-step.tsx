@@ -1,3 +1,4 @@
+import { formatBalance } from "@/lib/formatters"
 "use client"
 
 import { LoaderCircle, Check } from "lucide-react"
@@ -50,7 +51,7 @@ export function WalletStep({ wallets, selectedWallet, onSelect, onNext }: Props)
                     <div className="text-left">
                       <p className="text-sm font-medium text-foreground">{w.label}</p>
                       <p className="text-xs text-muted-foreground">
-                        Balance: {w.balance.toFixed(4)} {w.asset}
+                        Balance: {formatBalance(w.balance)} {w.asset}
                       </p>
                     </div>
                   </div>

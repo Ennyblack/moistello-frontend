@@ -15,7 +15,7 @@ const WalletSettings = dynamic(
 )
 import { get } from "@/lib/api-client"
 import { useTranslate } from "@/lib/locale/context"
-import { formatAddress, DEFAULT_LOCALE } from "@/lib/formatters"
+import { formatAddress, formatAmount, formatBalance, DEFAULT_LOCALE } from "@/lib/formatters"
 import { cn } from "@/lib/cn"
 import { useMultiWallet } from "@/hooks/use-multi-wallet"
 import { useUIStore } from "@/stores/ui-store"
@@ -350,15 +350,4 @@ export default function WalletPage() {
       </div>
     </div>
   )
-}
-
-function formatBalance(val?: string, locale: string = DEFAULT_LOCALE): string {
-  if (!val) return "0.0000"
-  const n = parseFloat(val)
-  if (isNaN(n)) return "0.0000"
-  return n.toLocaleString(locale, { minimumFractionDigits: 4, maximumFractionDigits: 4 })
-}
-
-function formatAmount(val: number, locale: string = DEFAULT_LOCALE): string {
-  return val.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }

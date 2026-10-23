@@ -275,3 +275,65 @@ export function formatDuration(minutes: number): string {
 }
 
 export const STELLAR_ADDRESS_REGEX = /^G[A-Z2-7]{55}$/;
+
+
+export interface FormatAmountOptions {
+  minimumFractionDigits?: number
+  maximumFractionDigits?: number
+}
+
+/**
+ * Format a numeric amount with locale-aware grouping and decimal separators.
+ * Handles numbers, strings, tiny amounts, edge cases (NaN, Infinity), and prevents -0.00.
+ */
+export function formatAmount(
+  val: number | string | null | undefined,
+  locale: string = DEFAULT_LOCALE,
+  options?: FormatAmountOptions
+): string {
+  if (val === null || val === undefined || val === "") return "0.00"
+  const n = typeof val === "string" ? parseFloat(val) : val
+  if (typeof n !== "number" || isNaN(n) || !isFinite(n)) return "0.00"
+
+  const minDigits = options?.minimumFractionDigits ?? 2
+  const maxDigits = options?.maximumFractionDigits ?? Math.max(minDigits, 2)
+
+  const threshold = Math.pow(10, -maxDigits) / 2
+  const normalized = Math.abs(n) < threshold ? 0 : n
+
+  return normalized.toLocaleString(locale, {
+    minimumFractionDigits: minDigits,
+    maximumFractionDigits: maxDigits,
+  })
+}
+
+/**
+ * Format a wallet balance (typically 4 decimal places for crypto/Stellar assets).
+ */
+export function formatBalance(
+  val?: string | number | null,
+  locale: string = DEFAULT_LOCALE,
+  precision: number = 4
+): string {
+  if (val === null || val === undefined || val === "") {
+    return (0).toLocaleString(locale, {
+      minimumFractionDigits: precision,
+      maximumFractionDigits: precision,
+    })
+  }
+  const n = typeof val === "string" ? parseFloat(val) : val
+  if (typeof n !== "number" || isNaN(n) || !isFinite(n)) {
+    return (0).toLocaleString(locale, {
+      minimumFractionDigits: precision,
+      maximumFractionDigits: precision,
+    })
+  }
+
+  const threshold = Math.pow(10, -precision) / 2
+  const normalized = Math.abs(n) < threshold ? 0 : n
+
+  return normalized.toLocaleString(locale, {
+    minimumFractionDigits: precision,
+    maximumFractionDigits: precision,
+  })
+}
