@@ -191,3 +191,106 @@ export async function voteOnProposal(
   }
   return { success: true, proposal: prop }
 }
+
+
+/* ───── Voting Power Delegation (#500) ───── */
+
+export interface ActiveDelegation {
+  delegatorAddress: string
+  delegateAddress: string
+  votingPower: number
+  delegatedAt: string
+}
+
+export interface GovernanceDelegationState {
+  userAddress: string
+  ownVotingPower: number
+  effectiveVotingPower: number
+  activeDelegation: ActiveDelegation | null
+  incomingDelegations: ActiveDelegation[]
+}
+
+export let MOCK_DELEGATION_STATE: GovernanceDelegationState = {
+  userAddress: "GCK4X9M3P6...8Y4T",
+  ownVotingPower: 1250,
+  effectiveVotingPower: 1700,
+  activeDelegation: null,
+  incomingDelegations: [
+    {
+      delegatorAddress: "GBV7N2M4P1J5X8L9K2W3Y4Z5A6B7C8D9E0F1G2H3I4J5K6L7M8N9O0P1",
+      delegateAddress: "GCK4X9M3P6...8Y4T",
+      votingPower: 450,
+      delegatedAt: "2024-05-01T10:00:00.000Z",
+    },
+  ],
+}
+
+export async function getGovernanceDelegations(
+  userAddress?: string,
+): Promise<GovernanceDelegationState> {
+  try {
+    const res = await get<GovernanceDelegationState>(
+      `/governance/delegations${userAddress ? `?address=${userAddress}` : ""}`,
+    )
+    if (res && typeof res === "object" && "ownVotingPower" in res) {
+      return res
+    }
+  } catch {
+    // Contract / mock fallback
+  }
+
+  const addr = userAddress || MOCK_DELEGATION_STATE.userAddress
+  const incomingTotal = MOCK_DELEGATION_STATE.incomingDelegations.reduce(
+    (sum, d) => sum + d.votingPower,
+    0,
+  )
+  const isDelegated = Boolean(MOCK_DELEGATION_STATE.activeDelegation)
+
+  return {
+    ...MOCK_DELEGATION_STATE,
+    userAddress: addr,
+    effectiveVotingPower: isDelegated
+      ? incomingTotal
+      : MOCK_DELEGATION_STATE.ownVotingPower + incomingTotal,
+  }
+}
+
+export async function delegateVotingPower(
+  delegateAddress: string,
+  votingPower?: number,
+): Promise<{ success: boolean; delegation: ActiveDelegation }> {
+  try {
+    await post("/governance/delegations", { delegateAddress, votingPower })
+  } catch {
+    // Local / contract mock fallback
+  }
+
+  const delegation: ActiveDelegation = {
+    delegatorAddress: MOCK_DELEGATION_STATE.userAddress,
+    delegateAddress,
+    votingPower: votingPower ?? MOCK_DELEGATION_STATE.ownVotingPower,
+    delegatedAt: new Date().toISOString(),
+  }
+
+  MOCK_DELEGATION_STATE = {
+    ...MOCK_DELEGATION_STATE,
+    activeDelegation: delegation,
+  }
+
+  return { success: true, delegation }
+}
+
+export async function revokeDelegation(): Promise<{ success: boolean }> {
+  try {
+    await post("/governance/delegations/revoke", {})
+  } catch {
+    // Local / contract mock fallback
+  }
+
+  MOCK_DELEGATION_STATE = {
+    ...MOCK_DELEGATION_STATE,
+    activeDelegation: null,
+  }
+
+  return { success: true }
+}

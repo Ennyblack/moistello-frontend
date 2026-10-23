@@ -1,33 +1,22 @@
 "use client"
 
-import Link from "next/link"
-import { useState, useMemo } from "react"
-import {
-  ArrowRight,
-  Landmark,
-  Plus,
-  Search,
-  ListFilter,
-  ChevronLeft,
-  ChevronRight,
-  RotateCcw,
-  CircleCheckBig,
-  CircleX,
-  Clock,
-  FileText,
-} from "lucide-react"
+import React, { useState, useMemo } from "react"
+import { Landmark, Plus, RotateCcw } from "lucide-react"
 import { Button, ButtonLink } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useGovernanceProposals } from "@/hooks/use-governance"
+import {
+  useGovernanceProposals,
+  useGovernanceDelegation,
+  useDelegateVotingPower,
+  useRevokeDelegation,
+} from "@/hooks/use-governance"
+import { useMultiWallet } from "@/hooks/use-multi-wallet"
+import { useUIStore } from "@/stores/ui-store"
+import { DelegationControls } from "./components/delegation-controls"
+import { GovernanceFiltersBar } from "./components/governance-filters-bar"
+import { ProposalCard } from "./components/proposal-card"
+import { ProposalsPagination } from "./components/proposals-pagination"
 import type { ProposalStatus } from "@/lib/governance-api"
-
-const statusTabs: { label: string; value: ProposalStatus }[] = [
-  { label: "All Proposals", value: "all" },
-  { label: "Active", value: "active" },
-  { label: "Passed", value: "passed" },
-  { label: "Defeated", value: "defeated" },
-]
 
 export default function GovernancePage() {
   const [selectedStatus, setSelectedStatus] = useState<ProposalStatus>("all")
@@ -37,7 +26,31 @@ export default function GovernancePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 3
 
+  const { address } = useMultiWallet()
+  const addToast = useUIStore((s) => s.addToast)
+
   const { data: proposals = [], isLoading, isError, refetch } = useGovernanceProposals(selectedStatus)
+  const { data: delegationState } = useGovernanceDelegation(address || undefined)
+  const delegateMutation = useDelegateVotingPower()
+  const revokeMutation = useRevokeDelegation()
+
+  const handleDelegate = async (delegateAddress: string) => {
+    try {
+      await delegateMutation.mutateAsync({ delegateAddress })
+      addToast({ type: "success", message: `Voting power successfully delegated to ${delegateAddress.slice(0, 8)}...` })
+    } catch {
+      addToast({ type: "error", message: "Failed to delegate voting power. Please try again." })
+    }
+  }
+
+  const handleRevoke = async () => {
+    try {
+      await revokeMutation.mutateAsync()
+      addToast({ type: "success", message: "Delegation revoked successfully. Your direct voting power is restored." })
+    } catch {
+      addToast({ type: "error", message: "Failed to revoke delegation. Please try again." })
+    }
+  }
 
   const filteredProposals = useMemo(() => {
     let result = [...proposals]
@@ -85,35 +98,6 @@ export default function GovernancePage() {
     setCurrentPage(1)
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-aurora-violet/30 bg-aurora-violet/10 px-2.5 py-0.5 text-xs text-aurora-violet font-semibold">
-            <Clock className="h-3 w-3" /> Active
-          </span>
-        )
-      case "passed":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-400 font-semibold">
-            <CircleCheckBig className="h-3 w-3" /> Passed
-          </span>
-        )
-      case "defeated":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-xs text-red-400 font-semibold">
-            <CircleX className="h-3 w-3" /> Defeated
-          </span>
-        )
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/5 px-2.5 py-0.5 text-xs text-muted-foreground font-semibold">
-            <FileText className="h-3 w-3" /> {status}
-          </span>
-        )
-    }
-  }
-
   return (
     <div className="relative overflow-hidden space-y-8" data-testid="governance-page">
       <div className="pointer-events-none absolute right-8 top-4 text-[11rem] font-heading font-black leading-none text-aurora-violet/5 select-none">
@@ -131,90 +115,45 @@ export default function GovernancePage() {
               Propose and vote on parameter changes, treasury disbursements, and community rules.
             </p>
           </div>
-          <ButtonLink href="/governance/create"  leftIcon={<Plus className="h-4 w-4" />} variant="primary">
-              Create proposal
-            </ButtonLink>
+          <ButtonLink href="/governance/create" leftIcon={<Plus className="h-4 w-4" />} variant="primary">
+            Create proposal
+          </ButtonLink>
         </div>
       </header>
 
-      {/* Tabs */}
-      <nav className="flex gap-6 border-b border-white/10 overflow-x-auto" aria-label="Proposal status">
-        {statusTabs.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            aria-pressed={selectedStatus === tab.value}
-            onClick={() => {
-              setSelectedStatus(tab.value)
-              setCurrentPage(1)
-            }}
-            className={`relative pb-3 text-sm font-medium transition-colors whitespace-nowrap ${
-              selectedStatus === tab.value ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-            data-testid={`status-tab-${tab.value}`}
-          >
-            {tab.label}
-            {selectedStatus === tab.value && (
-              <span className="absolute inset-x-0 -bottom-px h-0.5 bg-aurora-violet" />
-            )}
-          </button>
-        ))}
-      </nav>
+      {/* Voting Power Delegation Controls (#475 & #500) */}
+      {delegationState && (
+        <DelegationControls
+          delegationState={delegationState}
+          onDelegate={handleDelegate}
+          onRevoke={handleRevoke}
+          isDelegating={delegateMutation.isPending}
+          isRevoking={revokeMutation.isPending}
+        />
+      )}
 
-      {/* Filters and Search Bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border border-white/10 rounded-xl p-4 bg-white/[0.02]">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search proposals by title or category..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setCurrentPage(1)
-            }}
-            className="pl-9 bg-white/5 border-white/10"
-            data-testid="governance-search-input"
-          />
-        </div>
+      {/* Filters and Tabs */}
+      <GovernanceFiltersBar
+        selectedStatus={selectedStatus}
+        onStatusChange={(status) => {
+          setSelectedStatus(status)
+          setCurrentPage(1)
+        }}
+        search={search}
+        onSearchChange={(query) => {
+          setSearch(query)
+          setCurrentPage(1)
+        }}
+        categoryFilter={categoryFilter}
+        onCategoryFilterChange={(cat) => {
+          setCategoryFilter(cat)
+          setCurrentPage(1)
+        }}
+        sortBy={sortBy}
+        onSortByChange={setSortBy}
+      />
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <ListFilter className="h-4 w-4 text-aurora-violet" />
-            <select
-              aria-label="Proposal category"
-              value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-foreground"
-              data-testid="category-filter-select"
-            >
-              <option value="all" className="bg-background">All Categories</option>
-              <option value="circle parameter" className="bg-background">Circle Parameter</option>
-              <option value="treasury release" className="bg-background">Treasury Release</option>
-              <option value="rule amendment" className="bg-background">Rule Amendment</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Sort:</span>
-            <select
-              aria-label="Sort proposals"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as "newest" | "votes" | "oldest")}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-foreground"
-              data-testid="governance-sort-select"
-            >
-              <option value="newest" className="bg-background">Newest</option>
-              <option value="votes" className="bg-background">Most Votes</option>
-              <option value="oldest" className="bg-background">Oldest</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content / List */}
+      {/* Main Content / Proposals List */}
       {isLoading ? (
         <div className="space-y-4" data-testid="governance-loading-skeleton">
           {[1, 2, 3].map((n) => (
@@ -258,100 +197,21 @@ export default function GovernancePage() {
         </div>
       ) : (
         <div className="space-y-4" data-testid="proposals-list">
-          {paginatedProposals.map((proposal) => {
-            const totalVotes = proposal.votesFor + proposal.votesAgainst
-            const forPercent = totalVotes > 0 ? Math.round((proposal.votesFor / totalVotes) * 100) : 0
-
-            return (
-              <div
-                key={proposal.id}
-                className="group border border-white/10 rounded-xl p-6 hover:border-aurora-violet/30 hover:bg-white/[0.02] transition-all space-y-4"
-                data-testid={`proposal-card-${proposal.id}`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(proposal.status)}
-                    {proposal.category && (
-                      <span className="text-xs font-mono text-muted-foreground bg-white/5 px-2 py-0.5 rounded">
-                        {proposal.category}
-                      </span>
-                    )}
-                  </div>
-                  <span className="font-mono text-xs text-muted-foreground">ID: #{proposal.id}</span>
-                </div>
-
-                <Link href={`/governance/${proposal.id}`} className="block">
-                  <h2 className="font-heading text-xl font-bold text-foreground group-hover:text-aurora-violet transition-colors">
-                    {proposal.title}
-                  </h2>
-                  <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{proposal.description}</p>
-                </Link>
-
-                {/* Vote breakdown bar */}
-                <div className="space-y-1.5 pt-2">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span className="text-emerald-400 font-medium">For: {proposal.votesFor} ({forPercent}%)</span>
-                    <span className="text-red-400 font-medium">Against: {proposal.votesAgainst} ({100 - forPercent}%)</span>
-                  </div>
-                  <div className="h-2 w-full bg-red-500/20 rounded-full overflow-hidden flex">
-                    <div className="h-full bg-emerald-400 transition-all duration-300" style={{ width: `${forPercent}%` }} />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                  <span className="text-xs text-muted-foreground">
-                    Total Votes: <strong className="text-foreground">{totalVotes}</strong>
-                  </span>
-
-                  <ButtonLink href={`/governance/${proposal.id}`}  variant="ghost" size="sm" rightIcon={<ArrowRight className="h-3.5 w-3.5" />}>
-                      View & Vote
-                    </ButtonLink>
-                </div>
-              </div>
-            )
-          })}
+          {paginatedProposals.map((proposal) => (
+            <ProposalCard key={proposal.id} proposal={proposal} />
+          ))}
         </div>
       )}
 
       {/* Pagination Controls */}
-      {!isLoading && filteredProposals.length > 0 && (
-        <div className="flex items-center justify-between border-t border-white/10 pt-4" data-testid="governance-pagination">
-          <p className="text-xs text-muted-foreground">
-            Showing <span className="text-foreground font-medium">{(currentPage - 1) * pageSize + 1}</span> to{" "}
-            <span className="text-foreground font-medium">
-              {Math.min(currentPage * pageSize, filteredProposals.length)}
-            </span>{" "}
-            of <span className="text-foreground font-medium">{filteredProposals.length}</span> proposals
-          </p>
-
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-label="Previous proposals page"
-              onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-              disabled={currentPage === 1}
-              data-testid="gov-prev-page"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-xs text-muted-foreground px-2">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-label="Next proposals page"
-              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              data-testid="gov-next-page"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      {!isLoading && (
+        <ProposalsPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredProposals.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       )}
     </div>
   )
